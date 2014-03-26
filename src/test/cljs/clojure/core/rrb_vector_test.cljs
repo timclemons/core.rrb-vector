@@ -2,18 +2,20 @@
   (:require [clojure.core.rrb-vector :as fv]
             [clojure.core.rrb-vector.debug :as dv]
             [goog.string :as gstring]
-            goog.string.format))
+            goog.string.format
+            cljs-test.core)
+  (:use-macros [cljs-test.macros :only [deftest is is=]]))
 
-(set-print-fn! js/print)
+(enable-console-print!)
 
 (defn format [& args]
   (apply gstring/format args))
 
-(defn test-slicing []
-  (assert (dv/check-subvec 32000 10 29999 1234 18048 10123 10191)))
+(deftest test-slicing
+  (is (dv/check-subvec 32000 10 29999 1234 18048 10123 10191)))
 
-(defn test-slicing-generative []
-  (try (dv/generative-check-subvec 125 100000 10)
+(deftest test-slicing-generative
+  (try (is (dv/generative-check-subvec 125 100000 10))
        (catch ExceptionInfo e
          (throw (ex-info (format "%s: %s %s"
                                  (ex-message e)
@@ -22,13 +24,13 @@
                          {}
                          (ex-cause e))))))
 
-(defn test-splicing []
-  (assert (dv/check-catvec 1025 1025 3245 1025 32768 1025 1025 10123 1025 1025))
-  (assert (dv/check-catvec 10 40 40 40 40 40 40 40 40))
-  (assert (apply dv/check-catvec (repeat 30 33))))
+(deftest test-splicing
+  (is (dv/check-catvec 1025 1025 3245 1025 32768 1025 1025 10123 1025 1025))
+  (is (dv/check-catvec 10 40 40 40 40 40 40 40 40))
+  (is (apply dv/check-catvec (repeat 30 33))))
 
-(defn test-splicing-generative []
-  (try (dv/generative-check-catvec 125 15 10 30000)
+(deftest test-splicing-generative
+  (try (is (dv/generative-check-catvec 125 15 10 30000))
        (catch ExceptionInfo e
          (throw (ex-info (format "%s: %s"
                                  (.getMessage e)
@@ -36,43 +38,43 @@
                          {}
                          (.getCause e))))))
 
-(defn test-reduce []
+(deftest test-reduce
   (let [v1 (vec (range 128))
         v2 (fv/vec (range 128))]
-    (assert (= (reduce + v1) (reduce + v2)))
-    (assert (= (reduce-kv + 0 v1) (reduce-kv + 0 v2)))))
+    (is= (reduce + v1) (reduce + v2))
+    (is= (reduce-kv + 0 v1) (reduce-kv + 0 v2))))
 
-(defn test-seq []
+(deftest test-seq
   (let [v (fv/vec (range 128))
         s (seq v)]
-    (assert (= v s))
-    (assert (chunked-seq? s))
-    (assert (satisfies? IReduce s))))
+    (is= v s)
+    (is (chunked-seq? s))
+    (is (satisfies? IReduce s))))
 
-(defn test-assoc []
+(deftest test-assoc
   (let [v1 (fv/vec (range 40000))
         v2 (reduce (fn [out [k v]]
                      (assoc out k v))
                    (assoc v1 40000 :foo)
                    (map-indexed vector (rseq v1)))]
-    (assert (= (concat (rseq v1) [:foo]) v2)))
+    (is= (concat (rseq v1) [:foo]) v2))
   (loop [i 1]
     (if (< i 35000)
       (let [v (-> (range 40000)
                   (fv/vec)
                   (fv/subvec i)
                   (assoc 10 :foo))]
-        (assert (= :foo (nth v 10)))
+        (is= :foo (nth v 10))
         (recur (* i 32))))))
 
-(defn test-assoc! []
+(deftest test-assoc!
   (let [v1 (fv/vec (range 40000))
         v2 (persistent!
             (reduce (fn [out [k v]]
                       (assoc! out k v))
                     (assoc! (transient v1) 40000 :foo)
                     (map-indexed vector (rseq v1))))]
-    (assert (= (concat (rseq v1) [:foo]) v2)))
+    (is= (concat (rseq v1) [:foo]) v2))
   (loop [i 1]
     (if (< i 35000)
       (let [v (-> (range 40000)
@@ -81,26 +83,12 @@
                   (transient)
                   (assoc! 10 :foo)
                   (persistent!))]
-        (assert (= :foo (nth v 10)))
+        (is= :foo (nth v 10))
         (recur (* i 32))))))
 
-(defn test-relaxed []
-  (assert (= (into (fv/catvec (vec (range 123)) (vec (range 68))) (range 64))
-             (concat (range 123) (range 68) (range 64))))
-  (assert (= (dv/slow-into (fv/catvec (vec (range 123)) (vec (range 68)))
+(deftest test-relaxed
+  (is= (into (fv/catvec (vec (range 123)) (vec (range 68))) (range 64))
+             (concat (range 123) (range 68) (range 64)))
+  (is= (dv/slow-into (fv/catvec (vec (range 123)) (vec (range 68)))
                            (range 64))
-             (concat (range 123) (range 68) (range 64)))))
-
-(defn run-tests []
-  (test-slicing)
-  (test-slicing-generative)
-  (test-splicing)
-  (test-splicing-generative)
-  (test-reduce)
-  (test-seq)
-  (test-assoc)
-  (test-assoc!)
-  (test-relaxed)
-  (println "Tests completed without exception."))
-
-(run-tests)
+             (concat (range 123) (range 68) (range 64))))
